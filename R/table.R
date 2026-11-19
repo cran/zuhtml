@@ -49,9 +49,15 @@
 #'   is the decimal mark. `thousands`, if given, is a grouping mark allowed
 #'   between groups of three digits, as in `1,234,567.5`; a badly grouped
 #'   value such as `1,23` keeps the column character.
-#' * A value with a leading zero, such as `"0012"`, keeps the column
-#'   character: it is an identifier, not a number. `"0"` and `"0.5"` are
-#'   numbers.
+#'   Cell text has its non-breaking spaces turned into spaces, so
+#'   `thousands = "\u00a0"` matches either.
+#' * A value with a leading zero, such as `"0012"`, or `"0,123"` with
+#'   `thousands = ","`, keeps the column character: it is an identifier,
+#'   not a number. `"0"` and `"0.5"` are numbers.
+#' * A value with more than 15 significant digits, which a double need not
+#'   hold exactly, or one that overflows to infinity, underflows to zero or
+#'   is subnormal, such as `"12345678901234567890"`, `"1e999"` or
+#'   `"1e-310"`, keeps the column character.
 #' * `Inf`, `NaN`, `NA`, currency symbols and percentages are not numbers;
 #'   list such strings in `na`, or convert them yourself. A column with no
 #'   non-missing values stays character.
@@ -115,7 +121,17 @@ html_table <- function(x, header = "auto", trim = TRUE, na = character(),
     zuh_input_error("na", "`na` must be a character vector without NA.",
                     call = call)
   }
+  na <- zuh_utf8_valid(na, "na", call)
+  if (is.character(decimal)) {
+    decimal <- zuh_utf8_valid(decimal, "decimal", call)
+  }
+  if (is.character(thousands)) {
+    thousands <- zuh_utf8_valid(thousands, "thousands", call)
+  }
   limits <- zuh_check_limits(limits, call = call)
+  # Cell text has its non-breaking spaces turned into spaces, so a
+  # non-breaking space as the grouping mark matches a space.
+  if (identical(thousands, "\u00a0")) thousands <- " "
   zuh_check_convert(convert, decimal, thousands, call)
   n <- zuh_nodes(t)
   g <- zuh_grid(n, limits, call)
@@ -219,7 +235,22 @@ html_tables <- function(x, css = "table", match = NULL, ...) {
     zuh_input_error("match", "`match` must be NULL or a single string.",
                     call = call)
   }
-  tabs <- zuh_select_including(x, css, call)
+  if (!is.null(match)) {
+    match <- zuh_utf8_valid(match, "match", call)
+    tryCatch(
+      suppressWarnings(grepl(match, "")),
+      error = function(e) {
+        zuh_input_error(
+          "match",
+          sprintf("`match` is not a valid regular expression: %s",
+                  conditionMessage(e)),
+          call = call
+        )
+      }
+    )
+  }
+  # The default selector is the package's own; one given is the caller's.
+  tabs <- zuh_select_including(x, css, call, user = !missing(css))
   tabs <- tabs[html_name(tabs) %in% "table" &
                  html_namespace(tabs) %in% zuh_xhtml]
   n <- zuh_nodes(tabs)
@@ -232,11 +263,11 @@ html_tables <- function(x, css = "table", match = NULL, ...) {
 }
 
 # The elements of x matching css, including the nodes of x themselves,
-# without duplicates, in document order.
-zuh_select_including <- function(x, css, call) {
-  found <- html_elements(x, css)
+# without duplicates, in document order. `user` as in zuh_find().
+zuh_select_including <- function(x, css, call, user = FALSE) {
+  found <- zuh_find(x, css, 0L, call, user)
   if (!inherits(x, "zuhtml_nodeset")) return(found)
-  self <- html_filter(x, css)
+  self <- zuh_filter(x, css, call, user)
   new_nodeset(sort(unique(c(unclass(self), unclass(found)))),
               zuh_owner(found))
 }
@@ -302,11 +333,11 @@ html_table_cells <- function(x, trim = TRUE, absolute = FALSE,
   column <- first %% nc + 1L
 
   # Links outside nested tables, grouped by the cell that holds them.
-  links <- html_elements(cells, "a[href], area[href]")
-  mine <- as.integer(html_closest(links, "table")) == n$ids
+  links <- zuh_elements(cells, "a[href], area[href]")
+  mine <- as.integer(zuh_closest(links, "table")) == n$ids
   links <- links[mine]
   urls <- if (absolute) html_url(links) else html_attr(links, "href")
-  cell_of <- match(as.integer(html_closest(links, "td, th")), g$cell_node)
+  cell_of <- match(as.integer(zuh_closest(links, "td, th")), g$cell_node)
   by_cell <- split(urls, factor(cell_of, levels = seq_len(k)))
 
   out <- data.frame(
@@ -369,11 +400,26 @@ zuh_convert <- function(v, decimal, thousands) {
   }
   num <- paste0("^[+-]?(", int, "(", d, "[0-9]*)?|", d, "[0-9]+)",
                 "([eE][+-]?[0-9]+)?$")
-  if (!all(grepl(num, x)) || any(grepl("^[+-]?0[0-9]", x))) return(v)
+  if (!all(grepl(num, x))) return(v)
   if (!is.null(thousands)) y <- gsub(thousands, "", y, fixed = TRUE)
   if (decimal != ".") y <- sub(decimal, ".", y, fixed = TRUE)
+  x <- y[!is.na(y)]
+  # After the grouping marks are gone, so that "0,123" is caught too.
+  if (any(grepl("^[+-]?0[0-9]", x))) return(v)
+  # The significant digits of the mantissa: more than 15 need not survive
+  # a double (DBL_DIG), so such a column stays character.
+  digits <- gsub("[^0-9]", "", sub("[eE].*$", "", x))
+  digits <- sub("0+$", "", sub("^0+", "", digits))
+  if (any(nchar(digits) > 15L)) return(v)
   out <- as.numeric(y)
-  whole <- !grepl("[.eE]", y[!is.na(y)])
+  got <- out[!is.na(y)]
+  # Overflow to Inf, underflow to 0 and subnormals lose the value.
+  if (any(!is.finite(got)) ||
+      any(got == 0 & nzchar(digits)) ||
+      any(got != 0 & abs(got) < .Machine$double.xmin)) {
+    return(v)
+  }
+  whole <- !grepl("[.eE]", x)
   if (all(whole) && all(abs(out[!is.na(out)]) <= .Machine$integer.max)) {
     out <- as.integer(out)
   }

@@ -143,3 +143,53 @@ test_that("every label maps to an encoding iconv() can use here", {
     expect_false(is.na(iconv("a", name, "UTF-8")), info = e)
   }
 })
+
+test_that("a label with a non-ASCII byte is unknown, in any locale (#93)", {
+  forms <- list(
+    function(b) c(charToRaw('<meta charset="'), b, charToRaw('">')),
+    function(b) c(charToRaw(paste0("<meta http-equiv=content-type ",
+                                   "content=\"text/html; charset=")),
+                  b, charToRaw('">'))
+  )
+  check <- function() {
+    for (form in forms) {
+      for (b in 0x80:0xff) {
+        x <- c(form(as.raw(c(0x6c, b, 0xff))),
+               charToRaw("<meta charset=latin1><p>hi"))
+        expect_identical(zuh_prescan(x)$encoding, "windows-1252")
+      }
+    }
+    x <- c(charToRaw('<meta charset="'), as.raw(c(0xe9, 0xff)),
+           charToRaw('"><meta charset=latin1><p>hi'))
+    info <- html_info(html_parse(x))
+    expect_identical(info[c("encoding", "encoding_source")],
+                     list(encoding = "windows-1252", encoding_source = "meta"))
+  }
+  check()
+  local_c_ctype()
+  check()
+})
+
+test_that("windows-1255 and windows-1258 match the WHATWG indexes (#132)", {
+  # fixtures/whatwg/ holds the Encoding Standard's index files, unmodified
+  # (inst/COPYRIGHTS): one "pointer<TAB>code point<TAB>name" line per
+  # mapped byte 0x80 + pointer; a pointer absent from the file is unmapped.
+  index <- function(name) {
+    path <- test_path("fixtures", "whatwg", paste0("index-", name, ".txt"))
+    lines <- readLines(path, encoding = "UTF-8")
+    lines <- lines[nzchar(lines) & !startsWith(lines, "#")]
+    f <- strsplit(trimws(lines, "left"), "\t", fixed = TRUE)
+    want <- rep(NA_integer_, 128L)
+    want[as.integer(vapply(f, `[`, "", 1L)) + 1L] <-
+      strtoi(sub("^0x", "", vapply(f, `[`, "", 2L)), 16L)
+    want
+  }
+  for (name in c("windows-1255", "windows-1258")) {
+    want <- index(name)
+    expect_identical(zuh_sb_tables[[name]], want, label = name)
+    # And through the decoder: every mapped byte gives its code point.
+    mapped <- which(!is.na(want))
+    got <- utf8ToInt(rawToChar(decoded(as.raw(0x7f + mapped), name)))
+    expect_identical(got, want[mapped], label = name)
+  }
+})

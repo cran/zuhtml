@@ -1,6 +1,6 @@
 Package: zuhtml
-Title: Parse 'HTML' with a Bundled 'Gumbo' Parser
-Version: 0.1.0
+Title: Parse HTML with a Bundled 'Gumbo' Parser
+Version: 0.1.1
 Authors@R: c(
     person("Pedro", "Baltazar", , "pedrobtz@gmail.com",
            role = c("aut", "cre", "cph")),
@@ -8,33 +8,35 @@ Authors@R: c(
            comment = "Gumbo, bundled in src/vendor/gumbo"),
     person("Bjoern", "Hoehrmann", role = "cph",
            comment = "UTF-8 decoder in src/vendor/gumbo/utf8.c"))
-Description: Parses real-world 'HTML' with a bundled copy of the 'Gumbo'
-    parser (<https://codeberg.org/gumbo-parser/gumbo-parser>), which
-    follows the 'WHATWG' parsing algorithm, so that no system library is
+Description: Parses real-world HTML with a bundled copy of the 'Gumbo'
+    parser (<https://codeberg.org/gumbo-parser/gumbo-parser>), which follows
+    the parsing algorithm of the HTML standard, so that no system library is
     required. Documents become immutable trees navigated with a documented
-    subset of 'CSS' selectors. Attributes, text, lists, tables, links,
-    forms and page metadata ('JSON-LD', microdata) are extracted into
-    ordinary character vectors, lists and data frames, and nodes convert
-    to 'Markdown'. Input is a string, raw bytes, a file, a URL or a
-    connection, and raw input is decoded as browsers decode it, from a
-    byte-order mark or a '<meta>' declaration. Parsing is bounded by limits on input size, native memory and nesting
-    depth.
+    subset of CSS selectors. Attributes, text, lists, tables, links, forms
+    and page metadata (JSON-LD, microdata) are extracted into ordinary
+    character vectors, lists and data frames, and nodes convert to
+    Markdown. Input is a string, raw bytes, a file, a URL or a connection,
+    and raw input is decoded as browsers decode it, from a byte-order mark
+    or a meta element declaring the character set. Parsing is bounded by
+    limits on input size, native memory and nesting depth.
 License: MIT + file LICENSE
 Copyright: file inst/COPYRIGHTS
 URL: https://github.com/pedrobtz/zuhtml,
         https://pedrobtz.github.io/zuhtml/
 BugReports: https://github.com/pedrobtz/zuhtml/issues
 Depends: R (>= 4.1)
-Suggests: jsonlite, knitr, rmarkdown, testthat (>= 3.0.0), withr
+Suggests: commonmark, jsonlite, knitr, rmarkdown, testthat (>= 3.0.0),
+        withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Encoding: UTF-8
-Config/roxygen2/version: 8.1.0
+Language: en-GB
+Config/roxygen2/version: 8.1.1
 NeedsCompilation: yes
-Packaged: 2026-09-25 15:40:02 UTC; pbtz
+Packaged: 2026-11-19 08:50:31 UTC; pbtz
 Author: Pedro Baltazar [aut, cre, cph],
   Google Inc. [cph] (Gumbo, bundled in src/vendor/gumbo),
   Bjoern Hoehrmann [cph] (UTF-8 decoder in src/vendor/gumbo/utf8.c)
 Maintainer: Pedro Baltazar <pedrobtz@gmail.com>
 Repository: CRAN
-Date/Publication: 2026-10-06 14:10:02 UTC
+Date/Publication: 2026-11-19 11:20:02 UTC

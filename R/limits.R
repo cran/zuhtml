@@ -14,9 +14,14 @@
 #' `zuhtml_limit_error`, not a crash. At the defaults, 16 MiB of ordinary
 #' markup (about 1.5 million nodes, 450 MB) parses.
 #'
-#' @param max_input Largest input, in bytes of UTF-8 after decoding.
+#' @param max_input Largest input, in bytes of UTF-8 after decoding. Raw
+#'   input is also refused, before decoding, when it is longer than four
+#'   times this.
 #' @param max_memory Largest native memory the parser may hold at once, in
-#'   bytes.
+#'   bytes. A parse that runs past it reports the memory in use where it
+#'   stopped, which the parse needs at least; once a parse completes,
+#'   `html_info()$parse_peak_bytes` is the smallest value that parses that
+#'   input.
 #' @param max_depth Deepest nesting of open elements. Parsing time grows
 #'   with the square of nesting depth, so this bounds it; it is enforced
 #'   while parsing, not afterwards.
@@ -24,7 +29,10 @@
 #' @param max_errors Most parse problems kept for [html_problems()]. Parsing
 #'   continues past it; only the record is truncated.
 #' @param max_table_cells Most cells a table may expand to, spans included.
-#' @param max_selector_length Longest CSS selector, in bytes.
+#' @param max_selector_length Longest CSS selector, in bytes. The selection
+#'   functions take no `limits`: they use the limits the document was parsed
+#'   with. It bounds the selectors you pass, not the ones the extraction
+#'   functions such as [html_forms()] use internally.
 #'
 #' @return An object of class `zuhtml_limits`: a named list of the limits,
 #'   as doubles.
@@ -99,8 +107,14 @@ print.zuhtml_limits <- function(x, ...) {
   cat("<zuhtml_limits>\n")
   w <- max(nchar(names(x)))
   for (nm in names(x)) {
-    cat(sprintf("  %-*s %s\n", w, nm, format(x[[nm]], big.mark = ",",
-                                              scientific = FALSE)))
+    cat(sprintf("  %-*s %s\n", w, nm, zuh_format_count(x[[nm]])))
   }
   invisible(x)
+}
+
+# A whole number with "," between thousands. The decimal mark is fixed, as
+# a whole number has none: format() would otherwise take OutDec, and warn
+# when that is "," too.
+zuh_format_count <- function(v) {
+  format(v, big.mark = ",", decimal.mark = ".", scientific = FALSE)
 }

@@ -24,6 +24,7 @@ zuh_ledger_new(size_t max_bytes, size_t fail_at) {
     return NULL;
   lg->abort_to = NULL;
   lg->status = ZUH_OK;
+  lg->observed = 0;
   lg->blocks = NULL;
   lg->max_bytes = max_bytes;
   lg->fail_at = fail_at;
@@ -48,12 +49,19 @@ zuh_ledger_alloc(void *userdata, size_t size) {
   if (lg->fail_at != 0 && lg->n_allocs == lg->fail_at)
     ledger_abort(lg, ZUH_LIMIT_MEMORY);
 
-  /* Checked arithmetic: header plus payload, then against the budget. */
-  if (size > SIZE_MAX - sizeof(zuh_header))
+  /* Checked arithmetic: header plus payload, then against the budget. A
+   * request too large to count is a budget breach too, saturated (#130):
+   * observed = 0 would say the system refused memory. */
+  if (size > SIZE_MAX - sizeof(zuh_header)) {
+    lg->observed = SIZE_MAX;
     ledger_abort(lg, ZUH_LIMIT_MEMORY);
+  }
   total = sizeof(zuh_header) + size;
-  if (total > lg->max_bytes || lg->live_bytes > lg->max_bytes - total)
+  if (total > lg->max_bytes || lg->live_bytes > lg->max_bytes - total) {
+    lg->observed = total > SIZE_MAX - lg->live_bytes ? SIZE_MAX
+                                                     : lg->live_bytes + total;
     ledger_abort(lg, ZUH_LIMIT_MEMORY);
+  }
 
   /* Grow the block array before allocating the block, so that a failure
    * here leaves nothing unrecorded. */

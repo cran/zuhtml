@@ -62,6 +62,30 @@ A \verb{<template>} element's contents are its children here, but they are
 inert: searches and text extraction do not descend into them.
 \code{html_template_content()} returns them explicitly.
 }
+\section{Nodesets}{
+
+A \code{zuhtml_nodeset} holds node IDs that only mean something in the
+document that owns them. Subsetting (\code{[}, \code{[[}), \code{rev()}, \code{rep()},
+\code{unique()} and \verb{length<-} keep the owner; \verb{length<-} pads with missing
+nodes. \code{c()}, \verb{[<-} and \verb{[[<-} accept only nodes of the same document
+(and, for assignment, \code{NA} for a missing node), and raise a
+\code{zuhtml_input_error} otherwise.
+
+\code{==} and \code{!=} between two nodesets of the same document compare node
+identity, element by element: two \verb{<p>a</p>} elements are different
+nodes. Comparing nodes of different documents, or a nodeset with
+anything else, is a \code{zuhtml_input_error}. \code{match()}, \code{\%in\%},
+\code{setdiff()} and the other set operations compare nodes too, so a node is
+never found among another document's nodes. \code{sort()}, \code{order()} and
+\code{xtfrm()} follow document order.
+
+Every other operator (arithmetic, \code{<} and the other orderings, \code{!},
+\code{&}), the math functions, \code{sum()}, \code{max()}, \code{range()} and the rest of
+the Summary group, \code{mean()}, \code{median()} and \code{diff()} are refused with a
+\code{zuhtml_input_error}, and so is \code{rank()}, which needs \code{>}. Use
+\code{as.integer()} to work with the IDs as numbers.
+}
+
 \examples{
 doc <- html_parse("<ul><li>One</li><li>Two <b>bold</b></li></ul>")
 body <- html_children(html_root(doc))[2]

@@ -24,13 +24,14 @@ available through \code{\link[=html_attr]{html_attr()}}.
 \description{
 Reads a URL-valued attribute from each node and resolves it against the
 document's base URL with the reference-resolution algorithm of RFC 3986,
-section 5 (\url{https://www.rfc-editor.org/rfc/rfc3986#section-5}): dot
+section 5 (\url{https://www.rfc-editor.org/rfc/rfc3986.html#section-5}): dot
 segments are removed and relative, query-only, fragment-only and
 protocol-relative references are handled. Nothing is fetched.
 }
 \details{
 The base URL is \code{base_url} if given; otherwise the document's first
-\verb{<base href>} resolved against the \code{base_url} given to \code{\link[=html_parse]{html_parse()}};
+HTML \verb{<base href>} (not an SVG or MathML \verb{<base>}) resolved against the
+\code{base_url} given to \code{\link[=html_parse]{html_parse()}};
 otherwise that \code{base_url} alone.
 
 This is RFC 3986, not the WHATWG URL Standard browsers implement: there
